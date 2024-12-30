@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\BookBorrowingController;
 use App\Http\Controllers\Api\BookController;
 use App\Http\Controllers\Api\BorrowRequestController;
 use App\Http\Controllers\Api\CategoriesController;
+use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\FindBestCopyController;
 use App\Http\Controllers\Api\ForBorrowCopyController;
 use App\Http\Controllers\Api\UserController;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\Route;
 Route::post('/signup', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
 Route::post('/Admin/login', [AdminController::class, 'login']);
+Route::post('/email/verify', [EmailVerificationController::class, 'emailVerification']);
+Route::post('/refresh-token', [UserController::class, 'refreshToken']);
 
 Route::middleware([ClientAuth::class])->group(function () {
     //user
@@ -21,6 +24,7 @@ Route::middleware([ClientAuth::class])->group(function () {
     Route::post('logout', [UserController::class, 'logout']);
     //book
     Route::get('book', [BookController::class, 'getBook']);
+    Route::get('/books/search', [BookController::class, 'search']);
     Route::get('book/{id}', [BookController::class, 'getBook']);
     //category
     Route::get('category-books/{id}', [CategoriesController::class, 'categoryBooks']);
@@ -65,7 +69,6 @@ Route::middleware([ClientAuth::class . ':admin'])->group(function () {
     Route::post('receive-book-copy', [BookBorrowingController::class, 'receiveBookCopy']);
     //test
     Route::get('find-borrow-copy/{id}', [FindBestCopyController::class, 'findBestCopy']);
-    
 });
 
 

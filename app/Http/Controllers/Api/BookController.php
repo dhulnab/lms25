@@ -5,10 +5,40 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Book;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
+    public function search(Request $request)
+    {
+        $term = $request->input('term');
+        $minPrice = $request->input('min_price');
+        $maxPrice = $request->input('max_price');
+        $category = $request->input('category');
+
+        // Apply search with fuzzy matching and filters
+        $query = Book::search($term);
+
+        // Apply filters if present
+        if ($minPrice && $maxPrice) {
+            $query = $query->filterByPrice($minPrice, $maxPrice);
+        }
+
+        if ($category) {
+            $query = $query->filterByCategory($category);
+        }
+
+        // Order by relevance using ts_rank
+        $books = $query
+            ->orderByRaw("ts_rank(tsv, plainto_tsquery('english', ?)) DESC", [$term])
+            ->get();
+
+        return response()->json($books);
+    }
+
+
+
 
     public function getBook($id = null)
     {

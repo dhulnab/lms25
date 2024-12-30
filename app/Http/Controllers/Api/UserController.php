@@ -7,8 +7,12 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\Facades\JWTFactory;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
+use App\Notifications\EmailVerificationNotification;
+use Ichtrojan\Otp\Otp;
 
 class UserController extends Controller
 {
@@ -18,7 +22,6 @@ class UserController extends Controller
         $validator = Validator::make($req->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|max:255|unique:users,email',
-            'role' => 'in:client,admin,super_admin',
             'password' => 'required|string|min:8'
         ]);
         if ($validator->fails()) {
@@ -28,12 +31,11 @@ class UserController extends Controller
         $user = User::create([
             'name' => $req->get('name'),
             'email' => $req->get('email'),
-            'role' => $req->get('role') ?? 'client',
             'password' => Hash::make($req->get('password')),
         ]);
 
-        $token = JWTAuth::claims(['role' => $user->role])->fromUser($user);
-        return response()->json(compact('user', 'token'), 201);
+        $user->notify(new EmailVerificationNotification());
+        return response()->json(compact('user'), 201);
     }
 
     public function login(Request $req)
@@ -56,8 +58,20 @@ class UserController extends Controller
                     'message' => 'Invalid email or password.',
                 ], 401);
             }
+            if (!$user->email_verified_at) {
+                return response()->json([
+                    'success' => false,
+                    'verified' => false,
+                    'message' => 'Email not verified.',
+                ], 401);
+            }
             $token = JWTAuth::claims(['role' => $user->role])->fromUser($user);
-            return response()->json(compact('token'));
+            return response()->json([
+                'success' => true,
+                'verified' => true,
+                'user' => $user,
+                'token' => $token,
+            ], 200);
         } catch (JWTException $e) {
             return response()->json(['error' => 'Could not create token'], 500);
         }
@@ -83,6 +97,26 @@ class UserController extends Controller
             return response()->json(['message' => 'Successfully logged out']);
         } catch (JWTException $e) {
             return response()->json(['error' => 'Invalid or missing token'], 400);
+        }
+    }
+
+
+
+    public function refreshToken(Request $request)
+    {
+        try {
+            // Attempt to refresh the token
+            $newToken = JWTAuth::refresh(JWTAuth::getToken());
+
+            // Return the new token
+            return response()->json([
+                'token' => $newToken,
+                'token_type' => 'bearer',
+                'expires_in' => JWTAuth::factory()->getTTL() * 60 // Get TTL in seconds
+            ]);
+        } catch (JWTException $e) {
+            // Handle all JWT exceptions (expired, invalid, or missing token)
+            return response()->json(['error' => 'Token is invalid or missing'], 401);
         }
     }
 }

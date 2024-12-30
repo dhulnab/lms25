@@ -11,6 +11,32 @@ class Book extends Model
 {
     protected $guarded = ['id'];
 
+    public function scopeSearch($query, $term)
+    {
+        // Full-text search using tsvector
+        return $query->whereRaw("tsv @@ plainto_tsquery('english', ?)", [$term])
+            // Fuzzy search using pg_trgm's similarity operator for title, author, and description
+            ->orWhereRaw("title % ? OR author % ? OR description % ?", [$term, $term, $term])
+            // Fuzzy matching using pg_trgm with similarity
+            ->orWhereRaw("title ILIKE ? OR author ILIKE ? OR description ILIKE ?", ['%' . $term . '%', '%' . $term . '%', '%' . $term . '%'])
+            // Add pg_trgm similarity matching for fuzzy terms
+            ->orWhereRaw("similarity(title, ?) > 0.3 OR similarity(author, ?) > 0.3 OR similarity(description, ?) > 0.3", [$term, $term, $term]);
+    }
+
+
+    // Filter by price range
+    public function scopeFilterByPrice($query, $minPrice, $maxPrice)
+    {
+        return $query->whereBetween('price', [$minPrice, $maxPrice]);
+    }
+
+    // Filter by category
+    public function scopeFilterByCategory($query, $category)
+    {
+        return $query->where('category_id', $category);
+    }
+
+
     public function first_category(): BelongsTo
     {
         return $this->belongsTo(First_category::class);
